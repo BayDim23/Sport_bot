@@ -42,7 +42,6 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS user_data (
                     training_conditions TEXT)''')
 conn.commit()
 
-
 # Определение состояний бота
 class Survey(StatesGroup):
     language = State()
@@ -59,7 +58,6 @@ class Survey(StatesGroup):
     coda = State()
     training_conditions = State()
 
-
 # Кастомное middleware для логирования сообщений
 class LoggingMiddleware(BaseMiddleware):
     async def __call__(self, handler, event, data):
@@ -68,10 +66,8 @@ class LoggingMiddleware(BaseMiddleware):
             logging.info(f"Пользователь {message.from_user.id} отправил сообщение: {message.text}")
         return await handler(event, data)
 
-
 # Добавляем middleware в диспетчер
 dp.message.middleware(LoggingMiddleware())
-
 
 # Начало диалога - выбор языка
 @dp.message(F.text == '/start')
@@ -84,8 +80,8 @@ async def cmd_start(message: types.Message, state: FSMContext):
     # Обновление создания клавиатуры с параметром `keyboard`
     markup = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="English")],
-            [KeyboardButton(text="Русский")]
+            [KeyboardButton(text="🇬🇧 English")],
+            [KeyboardButton(text="🇷🇺 Русский")]
         ],
         resize_keyboard=True,
         one_time_keyboard=True
@@ -106,10 +102,10 @@ async def process_language(message: types.Message, state: FSMContext):
     # Обновление создания клавиатуры с параметром `keyboard`
     markup = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="Страна 1")],
-            [KeyboardButton(text="Страна 2")],
-            [KeyboardButton(text="Страна 3")],
-            [KeyboardButton(text="Другое")]
+            [KeyboardButton(text="🌍 Страна 1")],
+            [KeyboardButton(text="🌍 Страна 2")],
+            [KeyboardButton(text="🌍 Страна 3")],
+            [KeyboardButton(text="🌍 Другое")]
         ],
         resize_keyboard=True,
         one_time_keyboard=True
@@ -140,8 +136,8 @@ async def process_city(message: types.Message, state: FSMContext):
     # Обновление создания клавиатуры с параметром `keyboard`
     markup = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="Мужской")],
-            [KeyboardButton(text="Женский")]
+            [KeyboardButton(text="🚹 Мужской")],
+            [KeyboardButton(text="🚺 Женский")]
         ],
         resize_keyboard=True,
         one_time_keyboard=True
@@ -161,8 +157,8 @@ async def process_gender(message: types.Message, state: FSMContext):
     # Обновление создания клавиатуры с параметром `keyboard`
     markup = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="Главный судья")],
-            [KeyboardButton(text="Ассистент судьи")]
+            [KeyboardButton(text="⚖️ Главный судья")],
+            [KeyboardButton(text="⚖️ Ассистент судьи")]
         ],
         resize_keyboard=True,
         one_time_keyboard=True
@@ -182,11 +178,11 @@ async def process_role(message: types.Message, state: FSMContext):
     # Обновление создания клавиатуры с параметром `keyboard`
     markup = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="18-24")],
-            [KeyboardButton(text="25-34")],
-            [KeyboardButton(text="35-44")],
-            [KeyboardButton(text="45-54")],
-            [KeyboardButton(text="55 и старше")]
+            [KeyboardButton(text="🔢 18-24")],
+            [KeyboardButton(text="🔢 25-34")],
+            [KeyboardButton(text="🔢 35-44")],
+            [KeyboardButton(text="🔢 45-54")],
+            [KeyboardButton(text="🔢 55 и старше")]
         ],
         resize_keyboard=True,
         one_time_keyboard=True
@@ -206,11 +202,11 @@ async def process_age(message: types.Message, state: FSMContext):
     # Обновление создания клавиатуры с параметром `keyboard`
     markup = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="160-165 см")],
-            [KeyboardButton(text="166-170 см")],
-            [KeyboardButton(text="171-175 см")],
-            [KeyboardButton(text="176-180 см")],
-            [KeyboardButton(text="181 см и выше")]
+            [KeyboardButton(text="📏 160-165 см")],
+            [KeyboardButton(text="📏 166-170 см")],
+            [KeyboardButton(text="📏 171-175 см")],
+            [KeyboardButton(text="📏 176-180 см")],
+            [KeyboardButton(text="📏 181 см и выше")]
         ],
         resize_keyboard=True,
         one_time_keyboard=True
@@ -230,11 +226,11 @@ async def process_height(message: types.Message, state: FSMContext):
     # Обновление создания клавиатуры с параметром `keyboard`
     markup = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="50-60 кг")],
-            [KeyboardButton(text="61-70 кг")],
-            [KeyboardButton(text="71-80 кг")],
-            [KeyboardButton(text="81-90 кг")],
-            [KeyboardButton(text="91 кг и выше")]
+            [KeyboardButton(text="⚖️ 50-60 кг")],
+            [KeyboardButton(text="⚖️ 61-70 кг")],
+            [KeyboardButton(text="⚖️ 71-80 кг")],
+            [KeyboardButton(text="⚖️ 81-90 кг")],
+            [KeyboardButton(text="⚖️ 91 кг и выше")]
         ],
         resize_keyboard=True,
         one_time_keyboard=True
@@ -263,11 +259,11 @@ async def process_weight(message: types.Message, state: FSMContext):
     if role == "Главный судья":
         markup = ReplyKeyboardMarkup(
             keyboard=[
-                [KeyboardButton(text="<1,60 сек")],
-                [KeyboardButton(text="1,61-1,68 сек")],
-                [KeyboardButton(text="1,69-1,76 сек")],
-                [KeyboardButton(text="1,77-1,84 сек")],
-                [KeyboardButton(text=">1,84 сек")]
+                [KeyboardButton(text="🏃‍♂️ <1,60 сек")],
+                [KeyboardButton(text="🏃‍♂️ 1,61-1,68 сек")],
+                [KeyboardButton(text="🏃‍♂️ 1,69-1,76 сек")],
+                [KeyboardButton(text="🏃‍♂️ 1,77-1,84 сек")],
+                [KeyboardButton(text="🏃‍♂️ >1,84 сек")]
             ],
             resize_keyboard=True,
             one_time_keyboard=True
@@ -275,10 +271,10 @@ async def process_weight(message: types.Message, state: FSMContext):
     else:
         markup = ReplyKeyboardMarkup(
             keyboard=[
-                [KeyboardButton(text="<4,2 сек")],
-                [KeyboardButton(text="4,2-4,3 сек")],
-                [KeyboardButton(text="4,4-4,5 сек")],
-                [KeyboardButton(text=">4,5 сек")]
+                [KeyboardButton(text="🏃‍♂️ <4,2 сек")],
+                [KeyboardButton(text="🏃‍♂️ 4,2-4,3 сек")],
+                [KeyboardButton(text="🏃‍♂️ 4,4-4,5 сек")],
+                [KeyboardButton(text="🏃‍♂️ >4,5 сек")]
             ],
             resize_keyboard=True,
             one_time_keyboard=True
@@ -297,7 +293,12 @@ async def process_sprint_10m(message: types.Message, state: FSMContext):
     conn.commit()
 
     markup = ReplyKeyboardMarkup(
-        keyboard=[],
+        keyboard=[
+            [KeyboardButton(text="🏃‍♂️ <5,4 сек")],
+            [KeyboardButton(text="🏃‍♂️ 5,4-5,59 сек")],
+            [KeyboardButton(text="🏃‍♂️ 5,6-5,79 сек")],
+            [KeyboardButton(text="🏃‍♂️ >5,8 сек")]
+        ],
         resize_keyboard=True,
         one_time_keyboard=True
     )
@@ -314,7 +315,13 @@ async def process_sprint_40m(message: types.Message, state: FSMContext):
     conn.commit()
 
     markup = ReplyKeyboardMarkup(
-        keyboard=[],
+        keyboard=[
+            [KeyboardButton(text="🔄 <9,2 сек")],
+            [KeyboardButton(text="🔄 9,2-9,39 сек")],
+            [KeyboardButton(text="🔄 9,40-9,59 сек")],
+            [KeyboardButton(text="🔄 9,60-9,79 сек")],
+            [KeyboardButton(text="🔄 >9,80 сек")]
+        ],
         resize_keyboard=True,
         one_time_keyboard=True
     )
@@ -332,10 +339,10 @@ async def process_coda(message: types.Message, state: FSMContext):
 
     markup = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="К футбольному полю")],
-            [KeyboardButton(text="К стадиону")],
-            [KeyboardButton(text="К парку")],
-            [KeyboardButton(text="К тренажерному залу")]
+            [KeyboardButton(text="⚽️ К футбольному полю")],
+            [KeyboardButton(text="🏟 К стадиону")],
+            [KeyboardButton(text="🏞 К парку")],
+            [KeyboardButton(text="🏋️‍♂️ К тренажерному залу")]
         ],
         resize_keyboard=True,
         one_time_keyboard=True
@@ -351,7 +358,7 @@ async def process_training_conditions(message: types.Message, state: FSMContext)
     await state.update_data(training_conditions=message.text)
     cursor.execute("UPDATE user_data SET training_conditions = ? WHERE user_id = ?", (message.text, user_id))
     conn.commit()
-    await message.answer("Спасибо за предоставленную информацию! Ваши данные сохранены.")
+    await message.answer("✅ Спасибо за предоставленную информацию! Ваши данные сохранены.")
     await state.clear()
 
 
