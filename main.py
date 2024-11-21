@@ -1,7 +1,7 @@
 import logging
 import sqlite3
 import asyncio
-from aiogram import Bot, Dispatcher, types, BaseMiddleware, F
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
@@ -9,8 +9,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import TOKEN  # Импортируем токен из config
 
-# Инициализация бота и диспетчера
-API_TOKEN = TOKEN  # Замените 'TOKEN' на ваш реальный токен из config.py
+API_TOKEN = TOKEN
 bot = Bot(token=API_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
@@ -18,348 +17,235 @@ dp = Dispatcher(storage=storage)
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler())
 
-# Создание или подключение к базе данных SQLite
+# Подключение к базе данных SQLite и создание таблицы
 conn = sqlite3.connect('user_data.db')
 cursor = conn.cursor()
 
-# Создание таблицы для хранения данных пользователя
+# Создание таблицы для хранения данных пользователя, если её нет
 cursor.execute('''CREATE TABLE IF NOT EXISTS user_data (
                     user_id INTEGER PRIMARY KEY,
-                    language TEXT,
-                    country TEXT,
-                    city TEXT,
+                    name TEXT,
                     gender TEXT,
-                    role TEXT,
-                    age TEXT,
-                    height TEXT,
-                    weight TEXT,
-                    fat_percentage TEXT,
-                    sprint_10m TEXT,
-                    sprint_40m TEXT,
-                    coda TEXT,
-                    training_conditions TEXT)''')
+                    city TEXT,
+                    role TEXT)''')
 conn.commit()
+
 
 # Определение состояний бота
 class Survey(StatesGroup):
-    language = State()
-    country = State()
-    city = State()
+    start = State()
+    name = State()
     gender = State()
+    city = State()
     role = State()
-    age = State()
-    height = State()
-    weight = State()
-    fat_percentage = State()
-    sprint_10m = State()
-    sprint_40m = State()
-    coda = State()
-    training_conditions = State()
+    main_menu = State()
+    training_program = State()
+    workout_stage = State()
 
-# Кастомное middleware для логирования сообщений
-class LoggingMiddleware(BaseMiddleware):
-    async def __call__(self, handler, event, data):
-        message = event if isinstance(event, types.Message) else None
-        if message:
-            logging.info(f"Пользователь {message.from_user.id} отправил сообщение: {message.text}")
-        return await handler(event, data)
 
-# Добавляем middleware в диспетчер
-dp.message.middleware(LoggingMiddleware())
+# Массив этапов тренировок
+training_stages = [
+    {
+        "title": "Подготовительная часть",
+        "content": (
+            "1. Скручивания – 10 повторений. [Смотреть](https://disk.yandex.ru/i/7yDXy-wDJ5ofeg)\n"
+            "2. Боковая планка – 10 секунд на каждую сторону. [Смотреть](https://disk.yandex.ru/i/5-EUO_28YcMo_A)\n"
+            "3. Bird Dog – 10 повторений на каждую сторону. [Смотреть](https://disk.yandex.ru/i/xWGj17nJ2RKfww)"
+        ),
+    },
+    {
+        "title": "Основная часть, этап 1",
+        "content": (
+            "4. Бег с барьерами, лежа на животе – 12 повторений на каждую сторону.\n"
+            "5. Приседания с лентой над головой – 12 повторений. [Смотреть](https://disk.yandex.ru/i/Pf8kWkMsqRUJwA)"
+        ),
+    },
+    {
+        "title": "Основная часть, этап 2",
+        "content": (
+            "6. Прыгающий Джек (без рук) – 15 повторений.\n"
+            "7. Прыгающий Джек (руки вверх) – 15 повторений.\n"
+            "8. Подскоки на месте с прямыми ногами – 20 секунд.\n"
+            "9. Выпады вперед или в сторону – 10 повторений на каждую ногу."
+        ),
+    },
+    {
+        "title": "Основная подводящая часть",
+        "content": (
+            "1. Бег с активной постановкой стопы – 10 метров. [Смотреть](https://disk.yandex.ru/i/CtvsdmD_VgQRCQ)\n"
+            "2. Бег с акцентом на вынос бедра – 20 метров.\n"
+            "3. Прыжки на двух ногах через невысокие барьеры – 5 повторений. [Смотреть](https://disk.yandex.ru/i/B4JCsY9gbOUqgw)"
+        ),
+    },
+    {
+        "title": "Заключительная часть",
+        "content": (
+            "1. Растяжка квадрицепсов – 20-30 секунд на каждую ногу.\n"
+            "2. Растяжка подколенных сухожилий – 20-30 секунд.\n"
+            "3. Растяжка икроножных мышц – 20-30 секунд на каждую ногу.\n"
+            "4. Растяжка ягодичных мышц – 20-30 секунд на каждую сторону.\n"
+            "5. Растяжка мышц спины (поза ребенка) – 20-30 секунд."
+        ),
+    },
+]
 
-# Начало диалога - выбор языка
+
+# Функция для отправки текущего этапа тренировки
+async def send_training_stage(message: types.Message, state: FSMContext, stage_index: int):
+    if 0 <= stage_index < len(training_stages):
+        stage = training_stages[stage_index]
+        await state.update_data(stage_index=stage_index)  # Сохраняем текущий индекс этапа
+        await message.answer(
+            f"{stage['title']}\n\n{stage['content']}\n\nВыберите действие:",
+            parse_mode="Markdown",
+            reply_markup=ReplyKeyboardMarkup(
+                keyboard=[
+                    [KeyboardButton(text="Далее"), KeyboardButton(text="Назад")],
+                    [KeyboardButton(text="Главное меню")]
+                ],
+                resize_keyboard=True,
+                one_time_keyboard=True
+            ),
+        )
+    else:
+        await message.answer("Вы завершили все этапы тренировки!", reply_markup=ReplyKeyboardMarkup(
+            keyboard=[[KeyboardButton(text="Главное меню")]],
+            resize_keyboard=True,
+            one_time_keyboard=True
+        ))
+        await state.set_state(Survey.main_menu)
+
+
+# Начало диалога - приветствие и условия
 @dp.message(F.text == '/start')
 async def cmd_start(message: types.Message, state: FSMContext):
-    await state.clear()  # Сброс состояния при новом старте
+    await state.clear()
+    await message.answer(
+        "Добро пожаловать в сервис тренировок для футбольных судей! "
+        "Наш бот поможет вам развивать физические навыки и улучшить координацию.\n\n"
+        "Примите условия обработки данных, чтобы продолжить.",
+        reply_markup=ReplyKeyboardMarkup(
+            keyboard=[[KeyboardButton(text="Ознакомиться и согласиться")]],
+            resize_keyboard=True,
+            one_time_keyboard=True
+        )
+    )
+    await state.set_state(Survey.start)
 
-    # Приветственное сообщение
-    await message.answer("Я бот, который поможет вам находиться в отличной физической форме!")
 
-    # Обновление создания клавиатуры с параметром `keyboard`
-    markup = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🇬🇧 English")],
-            [KeyboardButton(text="🇷🇺 Русский")]
-        ],
+@dp.message(Survey.start, F.text == "Ознакомиться и согласиться")
+async def accept_terms(message: types.Message, state: FSMContext):
+    await message.answer("Введите ваше имя:")
+    await state.set_state(Survey.name)
+
+
+@dp.message(Survey.name)
+async def process_name(message: types.Message, state: FSMContext):
+    await state.update_data(name=message.text)
+    await message.answer("Выберите ваш пол:", reply_markup=ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="🚹 Мужской")], [KeyboardButton(text="🚺 Женский")]],
         resize_keyboard=True,
         one_time_keyboard=True
-    )
-    await message.answer("Choose your language / Выберите ваш язык:", reply_markup=markup)
-    await state.set_state(Survey.language)
+    ))
+    await state.set_state(Survey.gender)
 
 
-# Обработка выбора языка
-@dp.message(Survey.language)
-async def process_language(message: types.Message, state: FSMContext):
-    await state.update_data(language=message.text)
-    user_id = message.from_user.id
-    cursor.execute("INSERT OR IGNORE INTO user_data (user_id) VALUES (?)", (user_id,))
-    cursor.execute("UPDATE user_data SET language = ? WHERE user_id = ?", (message.text, user_id))
-    conn.commit()
-
-    # Обновление создания клавиатуры с параметром `keyboard`
-    markup = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🌍 Страна 1")],
-            [KeyboardButton(text="🌍 Страна 2")],
-            [KeyboardButton(text="🌍 Страна 3")],
-            [KeyboardButton(text="🌍 Другое")]
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True
-    )
-    await message.answer("Выберите вашу страну:", reply_markup=markup)
-    await state.set_state(Survey.country)
-
-
-# Обработка выбора страны
-@dp.message(Survey.country)
-async def process_country(message: types.Message, state: FSMContext):
-    user_id = message.from_user.id
-    await state.update_data(country=message.text)
-    cursor.execute("UPDATE user_data SET country = ? WHERE user_id = ?", (message.text, user_id))
-    conn.commit()
+@dp.message(Survey.gender)
+async def process_gender(message: types.Message, state: FSMContext):
+    await state.update_data(gender=message.text)
     await message.answer("Введите ваш город:")
     await state.set_state(Survey.city)
 
 
-# Обработка ввода города
 @dp.message(Survey.city)
 async def process_city(message: types.Message, state: FSMContext):
-    user_id = message.from_user.id
     await state.update_data(city=message.text)
-    cursor.execute("UPDATE user_data SET city = ? WHERE user_id = ?", (message.text, user_id))
-    conn.commit()
-
-    # Обновление создания клавиатуры с параметром `keyboard`
-    markup = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🚹 Мужской")],
-            [KeyboardButton(text="🚺 Женский")]
-        ],
+    await message.answer("Выберите вашу роль:", reply_markup=ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="Главный судья")], [KeyboardButton(text="Ассистент судьи")]],
         resize_keyboard=True,
         one_time_keyboard=True
-    )
-    await message.answer("Выберите ваш пол:", reply_markup=markup)
-    await state.set_state(Survey.gender)
-
-
-# Обработка выбора пола
-@dp.message(Survey.gender)
-async def process_gender(message: types.Message, state: FSMContext):
-    user_id = message.from_user.id
-    await state.update_data(gender=message.text)
-    cursor.execute("UPDATE user_data SET gender = ? WHERE user_id = ?", (message.text, user_id))
-    conn.commit()
-
-    # Обновление создания клавиатуры с параметром `keyboard`
-    markup = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="⚖️ Главный судья")],
-            [KeyboardButton(text="⚖️ Ассистент судьи")]
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True
-    )
-    await message.answer("Выберите свою роль:", reply_markup=markup)
+    ))
     await state.set_state(Survey.role)
 
 
-# Обработка выбора роли
 @dp.message(Survey.role)
 async def process_role(message: types.Message, state: FSMContext):
-    user_id = message.from_user.id
-    await state.update_data(role=message.text)
-    cursor.execute("UPDATE user_data SET role = ? WHERE user_id = ?", (message.text, user_id))
-    conn.commit()
-
-    # Обновление создания клавиатуры с параметром `keyboard`
-    markup = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🔢 18-24")],
-            [KeyboardButton(text="🔢 25-34")],
-            [KeyboardButton(text="🔢 35-44")],
-            [KeyboardButton(text="🔢 45-54")],
-            [KeyboardButton(text="🔢 55 и старше")]
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True
-    )
-    await message.answer("Выберите ваш возраст:", reply_markup=markup)
-    await state.set_state(Survey.age)
-
-
-# Обработка выбора возраста
-@dp.message(Survey.age)
-async def process_age(message: types.Message, state: FSMContext):
-    user_id = message.from_user.id
-    await state.update_data(age=message.text)
-    cursor.execute("UPDATE user_data SET age = ? WHERE user_id = ?", (message.text, user_id))
-    conn.commit()
-
-    # Обновление создания клавиатуры с параметром `keyboard`
-    markup = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="📏 160-165 см")],
-            [KeyboardButton(text="📏 166-170 см")],
-            [KeyboardButton(text="📏 171-175 см")],
-            [KeyboardButton(text="📏 176-180 см")],
-            [KeyboardButton(text="📏 181 см и выше")]
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True
-    )
-    await message.answer("Выберите ваш рост:", reply_markup=markup)
-    await state.set_state(Survey.height)
-
-
-# Обработка выбора роста
-@dp.message(Survey.height)
-async def process_height(message: types.Message, state: FSMContext):
-    user_id = message.from_user.id
-    await state.update_data(height=message.text)
-    cursor.execute("UPDATE user_data SET height = ? WHERE user_id = ?", (message.text, user_id))
-    conn.commit()
-
-    # Обновление создания клавиатуры с параметром `keyboard`
-    markup = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="⚖️ 50-60 кг")],
-            [KeyboardButton(text="⚖️ 61-70 кг")],
-            [KeyboardButton(text="⚖️ 71-80 кг")],
-            [KeyboardButton(text="⚖️ 81-90 кг")],
-            [KeyboardButton(text="⚖️ 91 кг и выше")]
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True
-    )
-    await message.answer("Выберите ваш вес:", reply_markup=markup)
-    await state.set_state(Survey.weight)
-
-
-# Обработка выбора веса
-@dp.message(Survey.weight)
-async def process_weight(message: types.Message, state: FSMContext):
-    user_id = message.from_user.id
-    await state.update_data(weight=message.text)
-    cursor.execute("UPDATE user_data SET weight = ? WHERE user_id = ?", (message.text, user_id))
-    conn.commit()
-
-    # Определяем набор кнопок в зависимости от роли
     user_data = await state.get_data()
-    role = user_data.get("role")
-    markup = ReplyKeyboardMarkup(
-        keyboard=[],
+    user_id = message.from_user.id
+    cursor.execute(
+        "INSERT OR IGNORE INTO user_data (user_id, name, gender, city, role) VALUES (?, ?, ?, ?, ?)",
+        (user_id, user_data['name'], user_data['gender'], user_data['city'], message.text))
+    conn.commit()
+
+    await message.answer("Выберите действие:", reply_markup=ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🏋️ Тренировочные занятия")],
+            [KeyboardButton(text="📜 Правила игры")]
+        ],
         resize_keyboard=True,
         one_time_keyboard=True
-    )
+    ))
+    await state.set_state(Survey.main_menu)
 
-    if role == "Главный судья":
-        markup = ReplyKeyboardMarkup(
+
+@dp.message(Survey.main_menu, F.text == "🏋️ Тренировочные занятия")
+async def show_training_programs(message: types.Message, state: FSMContext):
+    await message.answer(
+        "Выберите программу тренировок:",
+        reply_markup=ReplyKeyboardMarkup(
             keyboard=[
-                [KeyboardButton(text="🏃‍♂️ <1,60 сек")],
-                [KeyboardButton(text="🏃‍♂️ 1,61-1,68 сек")],
-                [KeyboardButton(text="🏃‍♂️ 1,69-1,76 сек")],
-                [KeyboardButton(text="🏃‍♂️ 1,77-1,84 сек")],
-                [KeyboardButton(text="🏃‍♂️ >1,84 сек")]
+                [KeyboardButton(text="Подготовительная часть")],
+                [KeyboardButton(text="Основная часть, этап 1")],
+                [KeyboardButton(text="Основная часть, этап 2")],
+                [KeyboardButton(text="Основная подводящая часть")],
+                [KeyboardButton(text="Заключительная часть")],
             ],
             resize_keyboard=True,
-            one_time_keyboard=True
-        )
-    else:
-        markup = ReplyKeyboardMarkup(
+            one_time_keyboard=True,
+        ),
+    )
+    await state.set_state(Survey.training_program)
+
+
+@dp.message(Survey.training_program, F.text.in_([stage["title"] for stage in training_stages]))
+async def start_training_stage(message: types.Message, state: FSMContext):
+    stage_index = next(i for i, stage in enumerate(training_stages) if stage["title"] == message.text)
+    await send_training_stage(message, state, stage_index)
+    await state.set_state(Survey.workout_stage)
+
+
+@dp.message(Survey.workout_stage, F.text == "Далее")
+async def next_training_stage(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    current_stage = data.get("stage_index", 0) + 1
+    await send_training_stage(message, state, current_stage)
+
+
+@dp.message(Survey.workout_stage, F.text == "Назад")
+async def previous_training_stage(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    current_stage = max(data.get("stage_index", 0) - 1, 0)
+    await send_training_stage(message, state, current_stage)
+
+
+@dp.message(Survey.workout_stage, F.text == "Главное меню")
+async def end_training(message: types.Message, state: FSMContext):
+    await message.answer(
+        "Вы вернулись в главное меню. Выберите программу тренировок:",
+        reply_markup=ReplyKeyboardMarkup(
             keyboard=[
-                [KeyboardButton(text="🏃‍♂️ <4,2 сек")],
-                [KeyboardButton(text="🏃‍♂️ 4,2-4,3 сек")],
-                [KeyboardButton(text="🏃‍♂️ 4,4-4,5 сек")],
-                [KeyboardButton(text="🏃‍♂️ >4,5 сек")]
+                [KeyboardButton(text="Подготовительная часть")],
+                [KeyboardButton(text="Основная часть, этап 1")],
+                [KeyboardButton(text="Основная часть, этап 2")],
+                [KeyboardButton(text="Основная подводящая часть")],
+                [KeyboardButton(text="Заключительная часть")],
             ],
             resize_keyboard=True,
-            one_time_keyboard=True
-        )
-
-    await message.answer("Введите ваш результат в тесте 10 м спринт:", reply_markup=markup)
-    await state.set_state(Survey.sprint_10m)
-
-
-# Обработка выбора результата в 10 м спринт
-@dp.message(Survey.sprint_10m)
-async def process_sprint_10m(message: types.Message, state: FSMContext):
-    user_id = message.from_user.id
-    await state.update_data(sprint_10m=message.text)
-    cursor.execute("UPDATE user_data SET sprint_10m = ? WHERE user_id = ?", (message.text, user_id))
-    conn.commit()
-
-    markup = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🏃‍♂️ <5,4 сек")],
-            [KeyboardButton(text="🏃‍♂️ 5,4-5,59 сек")],
-            [KeyboardButton(text="🏃‍♂️ 5,6-5,79 сек")],
-            [KeyboardButton(text="🏃‍♂️ >5,8 сек")]
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True
+            one_time_keyboard=True,
+        ),
     )
-    await message.answer("Введите ваш результат в тесте 40 м спринт:", reply_markup=markup)
-    await state.set_state(Survey.sprint_40m)
-
-
-# Обработка ввода результата 40 м спринт
-@dp.message(Survey.sprint_40m)
-async def process_sprint_40m(message: types.Message, state: FSMContext):
-    user_id = message.from_user.id
-    await state.update_data(sprint_40m=message.text)
-    cursor.execute("UPDATE user_data SET sprint_40m = ? WHERE user_id = ?", (message.text, user_id))
-    conn.commit()
-
-    markup = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🔄 <9,2 сек")],
-            [KeyboardButton(text="🔄 9,2-9,39 сек")],
-            [KeyboardButton(text="🔄 9,40-9,59 сек")],
-            [KeyboardButton(text="🔄 9,60-9,79 сек")],
-            [KeyboardButton(text="🔄 >9,80 сек")]
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True
-    )
-    await message.answer("Введите ваш результат в тесте CODA (Change of Directional Ability):", reply_markup=markup)
-    await state.set_state(Survey.coda)
-
-
-# Обработка ввода результата CODA
-@dp.message(Survey.coda)
-async def process_coda(message: types.Message, state: FSMContext):
-    user_id = message.from_user.id
-    await state.update_data(coda=message.text)
-    cursor.execute("UPDATE user_data SET coda = ? WHERE user_id = ?", (message.text, user_id))
-    conn.commit()
-
-    markup = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="⚽️ К футбольному полю")],
-            [KeyboardButton(text="🏟 К стадиону")],
-            [KeyboardButton(text="🏞 К парку")],
-            [KeyboardButton(text="🏋️‍♂️ К тренажерному залу")]
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True
-    )
-    await message.answer("Какие у вас тренировочные условия?", reply_markup=markup)
-    await state.set_state(Survey.training_conditions)
-
-
-# Обработка выбора тренировочных условий
-@dp.message(Survey.training_conditions)
-async def process_training_conditions(message: types.Message, state: FSMContext):
-    user_id = message.from_user.id
-    await state.update_data(training_conditions=message.text)
-    cursor.execute("UPDATE user_data SET training_conditions = ? WHERE user_id = ?", (message.text, user_id))
-    conn.commit()
-    await message.answer("✅ Спасибо за предоставленную информацию! Ваши данные сохранены.")
-    await state.clear()
+    await state.set_state(Survey.training_program)
 
 
 # Запуск бота
